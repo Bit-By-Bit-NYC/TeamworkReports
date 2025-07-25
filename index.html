@@ -17,6 +17,25 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        /* Style for sortable headers */
+        .sortable {
+            cursor: pointer;
+            position: relative;
+        }
+        .sortable::after {
+            content: ' \\2195'; /* Up-down arrow */
+            opacity: 0.4;
+            position: absolute;
+            right: 10px;
+        }
+        .sortable.asc::after {
+            content: ' \\2191'; /* Up arrow */
+            opacity: 1;
+        }
+        .sortable.desc::after {
+            content: ' \\2193'; /* Down arrow */
+            opacity: 1;
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
@@ -26,6 +45,14 @@
             <h1 class="text-4xl font-bold text-gray-900">Teamwork</h1>
             <p class="text-lg text-gray-600">Overdue Tasks Dashboard</p>
         </header>
+
+        <!-- Controls: Search and Export -->
+        <div id="controls" class="hidden mb-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <input type="text" id="search-box" placeholder="Search tasks..." class="w-full sm:w-1/2 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button id="export-csv" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">
+                Export to CSV
+            </button>
+        </div>
 
         <!-- Loading Spinner -->
         <div id="loader" class="flex justify-center items-center h-64">
@@ -39,15 +66,15 @@
         </div>
 
         <!-- Task Table -->
-        <div id="task-container" class="hidden bg-white shadow-md rounded-lg overflow-hidden">
+        <div id="task-container" class="hidden bg-white shadow-md rounded-lg overflow-x-auto">
             <table class="min-w-full leading-normal">
                 <thead>
                     <tr class="bg-gray-100 text-left text-gray-600 uppercase text-sm">
                         <th class="py-3 px-5">Task ID</th>
-                        <th class="py-3 px-5">Project</th>
-                        <th class="py-3 px-5">Task Name</th>
-                        <th class="py-3 px-5">Assigned To</th>
-                        <th class="py-3 px-5">Due Date</th>
+                        <th class="py-3 px-5 sortable" data-column="Project">Project</th>
+                        <th class="py-3 px-5 sortable" data-column="Task">Task Name</th>
+                        <th class="py-3 px-5 sortable" data-column="AssignedTo">Assigned To</th>
+                        <th class="py-3 px-5 sortable" data-column="DueDate">Due Date</th>
                     </tr>
                 </thead>
                 <tbody id="task-table-body" class="text-gray-700">
@@ -60,49 +87,31 @@
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             const loader = document.getElementById('loader');
+            const controls = document.getElementById('controls');
             const taskContainer = document.getElementById('task-container');
             const errorMessage = document.getElementById('error-message');
             const errorText = document.getElementById('error-text');
+            const searchBox = document.getElementById('search-box');
+            const exportButton = document.getElementById('export-csv');
 
+            let allTasks = [];
+            let currentSort = { column: 'DueDate', direction: 'asc' };
+
+            // --- 1. Fetch Data ---
             try {
-                // Call our Azure Function
                 const response = await fetch('/api/GetOverdueTasks');
-                
                 if (!response.ok) {
                     const errorData = await response.json();
                     throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
                 }
+                allTasks = await response.json();
 
-                const tasks = await response.json();
-                const tableBody = document.getElementById('task-table-body');
+                // Initial render
+                sortTasks();
+                renderTable(allTasks);
 
-                if (tasks.length === 0) {
-                    taskContainer.innerHTML = '<p class="text-center p-8 text-gray-500">👍 No overdue tasks found. Great job!</p>';
-                } else {
-                    tasks.forEach(task => {
-                        const row = document.createElement('tr');
-                        row.className = 'border-b border-gray-200 hover:bg-gray-50';
-                        
-                        // Format the due date for better readability
-                        const dueDate = new Date(task.DueDate).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric'
-                        });
-
-                        row.innerHTML = `
-                            <td class="py-4 px-5"><a href="${task.URL}" target="_blank" class="text-blue-600 hover:underline">${task.TaskID}</a></td>
-                            <td class="py-4 px-5">${task.Project}</td>
-                            <td class="py-4 px-5">${task.Task}</td>
-                            <td class="py-4 px-5">${task.AssignedTo}</td>
-                            <td class="py-4 px-5 text-red-600 font-medium">${dueDate}</td>
-                        `;
-                        tableBody.appendChild(row);
-                    });
-                }
-
-                // Show the table and hide the loader
                 loader.classList.add('hidden');
+                controls.classList.remove('hidden');
                 taskContainer.classList.remove('hidden');
 
             } catch (error) {
@@ -111,6 +120,121 @@
                 loader.classList.add('hidden');
                 errorMessage.classList.remove('hidden');
             }
+
+            // --- 2. Render Table Function ---
+            function renderTable(tasks) {
+                const tableBody = document.getElementById('task-table-body');
+                tableBody.innerHTML = ''; // Clear existing rows
+
+                if (tasks.length === 0) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `<td colspan="5" class="text-center p-8 text-gray-500">No tasks match your criteria.</td>`;
+                    tableBody.appendChild(row);
+                    return;
+                }
+
+                tasks.forEach(task => {
+                    const row = document.createElement('tr');
+                    row.className = 'border-b border-gray-200 hover:bg-gray-50';
+                    const dueDate = new Date(task.DueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+
+                    row.innerHTML = `
+                        <td class="py-4 px-5"><a href="${task.URL}" target="_blank" class="text-blue-600 hover:underline">${task.TaskID}</a></td>
+                        <td class="py-4 px-5">${task.Project}</td>
+                        <td class="py-4 px-5">${task.Task}</td>
+                        <td class="py-4 px-5">${task.AssignedTo}</td>
+                        <td class="py-4 px-5 text-red-600 font-medium">${dueDate}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            }
+
+            // --- 3. Filtering Logic ---
+            searchBox.addEventListener('input', () => {
+                const searchTerm = searchBox.value.toLowerCase();
+                const filteredTasks = allTasks.filter(task => {
+                    return (
+                        task.Project.toLowerCase().includes(searchTerm) ||
+                        task.Task.toLowerCase().includes(searchTerm) ||
+                        task.AssignedTo.toLowerCase().includes(searchTerm)
+                    );
+                });
+                renderTable(filteredTasks);
+            });
+
+            // --- 4. Sorting Logic ---
+            function sortTasks() {
+                const { column, direction } = currentSort;
+                allTasks.sort((a, b) => {
+                    const valA = a[column];
+                    const valB = b[column];
+                    let comparison = 0;
+
+                    if (column === 'DueDate') {
+                        comparison = new Date(valA) - new Date(valB);
+                    } else {
+                        comparison = valA.localeCompare(valB);
+                    }
+                    return direction === 'asc' ? comparison : -comparison;
+                });
+                
+                // Update header styles
+                document.querySelectorAll('.sortable').forEach(th => {
+                    th.classList.remove('asc', 'desc');
+                    if (th.dataset.column === column) {
+                        th.classList.add(direction);
+                    }
+                });
+            }
+            
+            document.querySelectorAll('.sortable').forEach(header => {
+                header.addEventListener('click', () => {
+                    const column = header.dataset.column;
+                    if (currentSort.column === column) {
+                        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        currentSort.column = column;
+                        currentSort.direction = 'asc';
+                    }
+                    sortTasks();
+                    // Re-render with the current filter applied
+                    searchBox.dispatchEvent(new Event('input'));
+                });
+            });
+
+            // --- 5. Export to CSV Logic ---
+            exportButton.addEventListener('click', () => {
+                const rows = Array.from(document.getElementById('task-table-body').querySelectorAll('tr'));
+                if (rows.length === 0 || rows[0].children.length <= 1) {
+                    alert("No data to export.");
+                    return;
+                }
+                
+                let csvContent = "data:text/csv;charset=utf-8,";
+                const headers = ["TaskID", "Project", "Task", "AssignedTo", "DueDate", "URL"];
+                csvContent += headers.join(",") + "\r\n";
+
+                rows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    const rowData = [
+                        cells[0].innerText,
+                        `"${cells[1].innerText.replace(/"/g, '""')}"`, // Project
+                        `"${cells[2].innerText.replace(/"/g, '""')}"`, // Task
+                        `"${cells[3].innerText.replace(/"/g, '""')}"`, // AssignedTo
+                        cells[4].innerText, // DueDate
+                        cells[0].querySelector('a').href // URL
+                    ];
+                    csvContent += rowData.join(",") + "\r\n";
+                });
+
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", "overdue-tasks.csv");
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
         });
     </script>
 </body>
