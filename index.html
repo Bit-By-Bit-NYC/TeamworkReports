@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overdue Teamwork Tasks</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .loader {
+            border-top-color: #3498db;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto px-4 py-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900">Teamwork</h1>
+            <p class="text-lg text-gray-600">Overdue Tasks Dashboard</p>
+        </header>
+
+        <!-- Loading Spinner -->
+        <div id="loader" class="flex justify-center items-center h-64">
+            <div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-32 w-32"></div>
+        </div>
+
+        <!-- Error Message -->
+        <div id="error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative text-center" role="alert">
+            <strong class="font-bold">Error!</strong>
+            <span class="block sm:inline" id="error-text"></span>
+        </div>
+
+        <!-- Task Table -->
+        <div id="task-container" class="hidden bg-white shadow-md rounded-lg overflow-hidden">
+            <table class="min-w-full leading-normal">
+                <thead>
+                    <tr class="bg-gray-100 text-left text-gray-600 uppercase text-sm">
+                        <th class="py-3 px-5">Task ID</th>
+                        <th class="py-3 px-5">Project</th>
+                        <th class="py-3 px-5">Task Name</th>
+                        <th class="py-3 px-5">Assigned To</th>
+                        <th class="py-3 px-5">Due Date</th>
+                    </tr>
+                </thead>
+                <tbody id="task-table-body" class="text-gray-700">
+                    <!-- Rows will be inserted here by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const loader = document.getElementById('loader');
+            const taskContainer = document.getElementById('task-container');
+            const errorMessage = document.getElementById('error-message');
+            const errorText = document.getElementById('error-text');
+
+            try {
+                // Call our Azure Function
+                const response = await fetch('/api/GetOverdueTasks');
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+
+                const tasks = await response.json();
+                const tableBody = document.getElementById('task-table-body');
+
+                if (tasks.length === 0) {
+                    taskContainer.innerHTML = '<p class="text-center p-8 text-gray-500">👍 No overdue tasks found. Great job!</p>';
+                } else {
+                    tasks.forEach(task => {
+                        const row = document.createElement('tr');
+                        row.className = 'border-b border-gray-200 hover:bg-gray-50';
+                        
+                        // Format the due date for better readability
+                        const dueDate = new Date(task.DueDate).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                        });
+
+                        row.innerHTML = `
+                            <td class="py-4 px-5"><a href="${task.URL}" target="_blank" class="text-blue-600 hover:underline">${task.TaskID}</a></td>
+                            <td class="py-4 px-5">${task.Project}</td>
+                            <td class="py-4 px-5">${task.Task}</td>
+                            <td class="py-4 px-5">${task.AssignedTo}</td>
+                            <td class="py-4 px-5 text-red-600 font-medium">${dueDate}</td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                }
+
+                // Show the table and hide the loader
+                loader.classList.add('hidden');
+                taskContainer.classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Failed to fetch tasks:', error);
+                errorText.textContent = error.message;
+                loader.classList.add('hidden');
+                errorMessage.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
