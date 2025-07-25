@@ -15,25 +15,25 @@
             animation: spin 1s linear infinite;
         }
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to { transform: rotate(3deg); }
         }
-        /* Style for sortable headers */
         .sortable {
             cursor: pointer;
             position: relative;
         }
-        .sortable::after {
-            content: ' \\2195'; /* Up-down arrow */
+        .sort-icon {
+            display: inline-block;
+            width: 1em;
+            height: 1em;
+            margin-left: 8px;
             opacity: 0.4;
-            position: absolute;
-            right: 10px;
+            transition: opacity 0.2s;
         }
-        .sortable.asc::after {
-            content: ' \\2191'; /* Up arrow */
-            opacity: 1;
+        .sortable:hover .sort-icon {
+            opacity: 0.7;
         }
-        .sortable.desc::after {
-            content: ' \\2193'; /* Down arrow */
+        .sortable.asc .sort-icon,
+        .sortable.desc .sort-icon {
             opacity: 1;
         }
     </style>
@@ -47,12 +47,16 @@
         </header>
 
         <!-- Controls: Search and Export -->
-        <div id="controls" class="hidden mb-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <input type="text" id="search-box" placeholder="Search tasks..." class="w-full sm:w-1/2 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <button id="export-csv" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">
-                Export to CSV
-            </button>
+        <div id="controls" class="hidden mb-4">
+            <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <input type="text" id="search-box" placeholder="Search tasks..." class="w-full sm:w-1/2 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button id="export-csv" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">
+                    Export to CSV
+                </button>
+            </div>
+            <p id="task-count" class="text-sm text-gray-600 mt-2"></p>
         </div>
+
 
         <!-- Loading Spinner -->
         <div id="loader" class="flex justify-center items-center h-64">
@@ -71,10 +75,22 @@
                 <thead>
                     <tr class="bg-gray-100 text-left text-gray-600 uppercase text-sm">
                         <th class="py-3 px-5">Task ID</th>
-                        <th class="py-3 px-5 sortable" data-column="Project">Project</th>
-                        <th class="py-3 px-5 sortable" data-column="Task">Task Name</th>
-                        <th class="py-3 px-5 sortable" data-column="AssignedTo">Assigned To</th>
-                        <th class="py-3 px-5 sortable" data-column="DueDate">Due Date</th>
+                        <th class="py-3 px-5 sortable" data-column="Project">
+                            <span>Project</span>
+                            <span class="sort-icon"></span>
+                        </th>
+                        <th class="py-3 px-5 sortable" data-column="Task">
+                            <span>Task Name</span>
+                            <span class="sort-icon"></span>
+                        </th>
+                        <th class="py-3 px-5 sortable" data-column="AssignedTo">
+                            <span>Assigned To</span>
+                            <span class="sort-icon"></span>
+                        </th>
+                        <th class="py-3 px-5 sortable" data-column="DueDate">
+                            <span>Due Date</span>
+                            <span class="sort-icon"></span>
+                        </th>
                     </tr>
                 </thead>
                 <tbody id="task-table-body" class="text-gray-700">
@@ -93,6 +109,14 @@
             const errorText = document.getElementById('error-text');
             const searchBox = document.getElementById('search-box');
             const exportButton = document.getElementById('export-csv');
+            const taskCountElement = document.getElementById('task-count');
+
+            // SVG icons for sorting
+            const sortIcons = {
+                none: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>`,
+                asc: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>`,
+                desc: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>`
+            };
 
             let allTasks = [];
             let currentSort = { column: 'DueDate', direction: 'asc' };
@@ -125,6 +149,9 @@
             function renderTable(tasks) {
                 const tableBody = document.getElementById('task-table-body');
                 tableBody.innerHTML = ''; // Clear existing rows
+                
+                // Update task count
+                taskCountElement.textContent = `Showing ${tasks.length} of ${allTasks.length} overdue tasks.`;
 
                 if (tasks.length === 0) {
                     const row = document.createElement('tr');
@@ -178,11 +205,14 @@
                     return direction === 'asc' ? comparison : -comparison;
                 });
                 
-                // Update header styles
+                // Update header styles and icons
                 document.querySelectorAll('.sortable').forEach(th => {
+                    const iconSpan = th.querySelector('.sort-icon');
                     th.classList.remove('asc', 'desc');
+                    iconSpan.innerHTML = sortIcons.none;
                     if (th.dataset.column === column) {
                         th.classList.add(direction);
+                        iconSpan.innerHTML = sortIcons[direction];
                     }
                 });
             }
@@ -201,6 +231,10 @@
                     searchBox.dispatchEvent(new Event('input'));
                 });
             });
+            
+            // Set initial sort icons
+            document.querySelectorAll('.sortable .sort-icon').forEach(icon => icon.innerHTML = sortIcons.none);
+            sortTasks(); // Apply initial sort on load
 
             // --- 5. Export to CSV Logic ---
             exportButton.addEventListener('click', () => {
