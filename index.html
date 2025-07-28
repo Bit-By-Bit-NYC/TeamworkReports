@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Overdue Teamwork Tasks</title>
+    <title>BBB Teamwork Tasks</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -43,7 +43,7 @@
     <div class="container mx-auto px-4 py-8">
         <header class="text-center mb-8">
             <h1 class="text-4xl font-bold text-gray-900">Teamwork</h1>
-            <p class="text-lg text-gray-600">Overdue Tasks Dashboard</p>
+            <p class="text-lg text-gray-600">BBB Teamwork Tasks Dashboard</p>
         </header>
 
         <!-- Controls: Search, Dates, and Export -->
@@ -163,7 +163,7 @@
                 tableBody.innerHTML = ''; // Clear existing rows
                 
                 // Update task count
-                taskCountElement.textContent = `Showing ${tasks.length} of ${allTasks.length} overdue tasks.`;
+                taskCountElement.textContent = `Showing ${tasks.length} of ${allTasks.length} tasks.`;
 
                 if (tasks.length === 0) {
                     const row = document.createElement('tr');
@@ -296,7 +296,7 @@
                 const encodedUri = encodeURI(csvContent);
                 const link = document.createElement("a");
                 link.setAttribute("href", encodedUri);
-                link.setAttribute("download", "overdue-tasks.csv");
+                link.setAttribute("download", "bbb-teamwork-tasks.csv");
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
