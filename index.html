@@ -15,7 +15,7 @@
             animation: spin 1s linear infinite;
         }
         @keyframes spin {
-            to { transform: rotate(3deg); }
+            to { transform: rotate(360deg); }
         }
         .sortable {
             cursor: pointer;
@@ -46,15 +46,25 @@
             <p class="text-lg text-gray-600">Overdue Tasks Dashboard</p>
         </header>
 
-        <!-- Controls: Search and Export -->
-        <div id="controls" class="hidden mb-4">
+        <!-- Controls: Search, Dates, and Export -->
+        <div id="controls" class="hidden mb-4 space-y-4">
             <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
                 <input type="text" id="search-box" placeholder="Search tasks..." class="w-full sm:w-1/2 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <button id="export-csv" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">
                     Export to CSV
                 </button>
             </div>
-            <p id="task-count" class="text-sm text-gray-600 mt-2"></p>
+            <div class="flex flex-col sm:flex-row justify-start items-center gap-4">
+                <div class="w-full sm:w-auto">
+                    <label for="start-date" class="text-sm font-medium text-gray-700">From:</label>
+                    <input type="date" id="start-date" class="w-full sm:w-auto mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="w-full sm:w-auto">
+                    <label for="end-date" class="text-sm font-medium text-gray-700">To:</label>
+                    <input type="date" id="end-date" class="w-full sm:w-auto mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+            <p id="task-count" class="text-sm text-gray-600 pt-2"></p>
         </div>
 
 
@@ -110,6 +120,8 @@
             const searchBox = document.getElementById('search-box');
             const exportButton = document.getElementById('export-csv');
             const taskCountElement = document.getElementById('task-count');
+            const startDateInput = document.getElementById('start-date');
+            const endDateInput = document.getElementById('end-date');
 
             // SVG icons for sorting
             const sortIcons = {
@@ -132,7 +144,7 @@
 
                 // Initial render
                 sortTasks();
-                renderTable(allTasks);
+                applyFiltersAndRender();
 
                 loader.classList.add('hidden');
                 controls.classList.remove('hidden');
@@ -177,17 +189,35 @@
             }
 
             // --- 3. Filtering Logic ---
-            searchBox.addEventListener('input', () => {
+            function applyFiltersAndRender() {
                 const searchTerm = searchBox.value.toLowerCase();
+                const startDate = startDateInput.value ? new Date(startDateInput.value) : null;
+                const endDate = endDateInput.value ? new Date(endDateInput.value) : null;
+
+                // Adjust dates to cover the full day
+                if (startDate) startDate.setHours(0, 0, 0, 0);
+                if (endDate) endDate.setHours(23, 59, 59, 999);
+
                 const filteredTasks = allTasks.filter(task => {
-                    return (
+                    const textMatch = (
                         task.Project.toLowerCase().includes(searchTerm) ||
                         task.Task.toLowerCase().includes(searchTerm) ||
                         task.AssignedTo.toLowerCase().includes(searchTerm)
                     );
+
+                    const taskDueDate = new Date(task.DueDate);
+                    const dateMatch = 
+                        (!startDate || taskDueDate >= startDate) &&
+                        (!endDate || taskDueDate <= endDate);
+
+                    return textMatch && dateMatch;
                 });
                 renderTable(filteredTasks);
-            });
+            }
+
+            searchBox.addEventListener('input', applyFiltersAndRender);
+            startDateInput.addEventListener('change', applyFiltersAndRender);
+            endDateInput.addEventListener('change', applyFiltersAndRender);
 
             // --- 4. Sorting Logic ---
             function sortTasks() {
@@ -200,7 +230,7 @@
                     if (column === 'DueDate') {
                         comparison = new Date(valA) - new Date(valB);
                     } else {
-                        comparison = valA.localeCompare(valB);
+                        comparison = String(valA).localeCompare(String(valB));
                     }
                     return direction === 'asc' ? comparison : -comparison;
                 });
@@ -227,8 +257,7 @@
                         currentSort.direction = 'asc';
                     }
                     sortTasks();
-                    // Re-render with the current filter applied
-                    searchBox.dispatchEvent(new Event('input'));
+                    applyFiltersAndRender();
                 });
             });
             
@@ -240,7 +269,10 @@
             exportButton.addEventListener('click', () => {
                 const rows = Array.from(document.getElementById('task-table-body').querySelectorAll('tr'));
                 if (rows.length === 0 || rows[0].children.length <= 1) {
-                    alert("No data to export.");
+                    // Use a more user-friendly notification instead of alert()
+                    const originalText = exportButton.innerText;
+                    exportButton.innerText = "No data to export!";
+                    setTimeout(() => { exportButton.innerText = originalText; }, 2000);
                     return;
                 }
                 
