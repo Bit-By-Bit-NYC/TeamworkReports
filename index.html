@@ -292,7 +292,7 @@
                         `"${cells[1].innerText.replace(/"/g, '""')}"`, // Project
                         `"${cells[2].innerText.replace(/"/g, '""')}"`, // Task
                         `"${cells[3].innerText.replace(/"/g, '""')}"`, // AssignedTo
-                        cells[4].innerText, // DueDate
+                        `"${cells[4].innerText.replace(/"/g, '""')}"`, // DueDate
                         cells[0].querySelector('a').href // URL
                     ];
                     csvContent += rowData.join(",") + "\r\n";
