@@ -311,17 +311,13 @@
 
             // --- 3. Filtering Logic ---
             function applyFiltersAndRender() {
-                const startDate = startDateInput.value ? new Date(startDateInput.value) : null;
-                const endDate = endDateInput.value ? new Date(endDateInput.value) : null;
+                const startDateStr = startDateInput.value;
+                const endDateStr = endDateInput.value;
 
                 const filters = {};
                 columnFilters.forEach(input => {
                     filters[input.dataset.columnFilter] = input.value.toLowerCase();
                 });
-
-                // Adjust dates to cover the full day
-                if (startDate) startDate.setHours(0, 0, 0, 0);
-                if (endDate) endDate.setHours(23, 59, 59, 999);
 
                 const filteredTasks = allTasks.filter(task => {
                     const textMatch = Object.keys(filters).every(key => {
@@ -329,22 +325,23 @@
                         if (!filterValue) return true;
 
                         if (key === 'DueDate') {
-                             const dueDateFormatted = new Date(task.DueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                             const dueDateFormatted = parseDateAsLocal(task.DueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
                              return dueDateFormatted.toLowerCase().includes(filterValue);
                         }
                         if (key === 'OriginalDueDate') {
                              if (!task.OriginalDueDate) return false;
-                             const originalDueDateFormatted = new Date(task.OriginalDueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                             const originalDueDateFormatted = parseDateAsLocal(task.OriginalDueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
                              return originalDueDateFormatted.toLowerCase().includes(filterValue);
                         }
                         
                         return String(task[key]).toLowerCase().includes(filterValue);
                     });
 
-                    const taskDueDate = parseDateAsLocal(task.DueDate);
+                    // Date range filtering using string comparison on the original, un-adjusted dates
+                    const originalTaskDateStr = task.DueDate ? task.DueDate.split('T')[0] : null;
                     const dateMatch = 
-                        (!startDate || taskDueDate >= startDate) &&
-                        (!endDate || taskDueDate <= endDate);
+                        (!startDateStr || (originalTaskDateStr && originalTaskDateStr >= startDateStr)) &&
+                        (!endDateStr || (originalTaskDateStr && originalTaskDateStr <= endDateStr));
                     
                     const mismatchMatch = !filterMismatched || (task.OriginalDueDate && parseDateAsLocal(task.DueDate).getTime() !== parseDateAsLocal(task.OriginalDueDate).getTime());
 
