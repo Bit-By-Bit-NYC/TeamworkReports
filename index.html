@@ -215,8 +215,8 @@
                 if (!dateString) return null;
                 const [datePart] = dateString.split('T');
                 const [year, month, day] = datePart.split('-').map(Number);
-                // Create date in local timezone at midnight
-                return new Date(year, month - 1, day);
+                // Create date in local timezone at midnight and add one day to adjust for API discrepancy
+                return new Date(year, month - 1, day + 1);
             };
 
             // SVG icons for sorting
