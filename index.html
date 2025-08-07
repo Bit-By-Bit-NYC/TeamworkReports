@@ -68,6 +68,9 @@
                     <label for="end-date" class="text-sm font-medium text-gray-700">To:</label>
                     <input type="date" id="end-date" class="w-full sm:w-auto mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
+                <div class="w-full sm:w-auto sm:self-end">
+                    <button id="show-overdue-btn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Show Overdue</button>
+                </div>
             </div>
             <p id="task-count" class="text-sm text-gray-600 pt-2"></p>
         </div>
@@ -127,6 +130,7 @@
             const taskCountElement = document.getElementById('task-count');
             const startDateInput = document.getElementById('start-date');
             const endDateInput = document.getElementById('end-date');
+            const showOverdueBtn = document.getElementById('show-overdue-btn');
 
             // SVG icons for sorting
             const sortIcons = {
@@ -180,14 +184,22 @@
                 tasks.forEach(task => {
                     const row = document.createElement('tr');
                     row.className = 'border-b border-gray-200 hover:bg-gray-50';
-                    const dueDate = new Date(task.DueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+
+                    const taskDueDate = new Date(task.DueDate);
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0); // Compare against the start of today
+
+                    const isOverdue = taskDueDate < today;
+                    const dueDateClass = isOverdue ? 'text-red-600 font-semibold' : '';
+
+                    const dueDateFormatted = taskDueDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 
                     row.innerHTML = `
                         <td class="py-4 px-5"><a href="${task.URL}" target="_blank" class="text-blue-600 hover:underline">${task.TaskID}</a></td>
                         <td class="py-4 px-5">${task.Project}</td>
                         <td class="py-4 px-5">${task.Task}</td>
                         <td class="py-4 px-5">${task.AssignedTo}</td>
-                        <td class="py-4 px-5">${dueDate}</td>
+                        <td class="py-4 px-5 ${dueDateClass}">${dueDateFormatted}</td>
                     `;
                     tableBody.appendChild(row);
                 });
@@ -223,6 +235,16 @@
             searchBox.addEventListener('input', applyFiltersAndRender);
             startDateInput.addEventListener('change', applyFiltersAndRender);
             endDateInput.addEventListener('change', applyFiltersAndRender);
+
+            showOverdueBtn.addEventListener('click', () => {
+                const today = new Date();
+                const yesterday = new Date(today);
+                yesterday.setDate(today.getDate() - 1);
+
+                startDateInput.value = '';
+                endDateInput.value = yesterday.toISOString().split('T')[0];
+                applyFiltersAndRender();
+            });
 
             // --- 4. Sorting Logic ---
             function sortTasks() {
