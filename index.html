@@ -90,6 +90,7 @@
                 <div class="w-full sm:w-auto sm:self-end flex gap-2 flex-wrap">
                     <button id="show-upcoming-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Show Upcoming</button>
                     <button id="show-overdue-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Show Overdue</button>
+                    <button id="show-mismatched-btn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Mismatched Dates</button>
                     <button id="clear-filters-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Clear Filters</button>
                 </div>
             </div>
@@ -129,6 +130,10 @@
                             <span>Due Date</span>
                             <span class="sort-icon"></span>
                         </th>
+                        <th class="py-3 px-5 sortable" data-column="OriginalDueDate">
+                            <span>Original Due Date</span>
+                            <span class="sort-icon"></span>
+                        </th>
                     </tr>
                     <tr class="bg-gray-100 dark:bg-gray-700">
                         <th class="p-2"><input type="text" data-column-filter="TaskID" placeholder="Filter ID..." class="filter-input w-full px-2 py-1 border rounded-md dark:bg-gray-600 dark:border-gray-500 dark:text-white dark:placeholder-gray-400"></th>
@@ -136,6 +141,7 @@
                         <th class="p-2"><input type="text" data-column-filter="Task" placeholder="Filter Task..." class="filter-input w-full px-2 py-1 border rounded-md dark:bg-gray-600 dark:border-gray-500 dark:text-white dark:placeholder-gray-400"></th>
                         <th class="p-2"><input type="text" data-column-filter="AssignedTo" placeholder="Filter Assignee..." class="filter-input w-full px-2 py-1 border rounded-md dark:bg-gray-600 dark:border-gray-500 dark:text-white dark:placeholder-gray-400"></th>
                         <th class="p-2"><input type="text" data-column-filter="DueDate" placeholder="Filter Date..." class="filter-input w-full px-2 py-1 border rounded-md dark:bg-gray-600 dark:border-gray-500 dark:text-white dark:placeholder-gray-400"></th>
+                        <th class="p-2"><input type="text" data-column-filter="OriginalDueDate" placeholder="Filter Date..." class="filter-input w-full px-2 py-1 border rounded-md dark:bg-gray-600 dark:border-gray-500 dark:text-white dark:placeholder-gray-400"></th>
                     </tr>
                 </thead>
                 <tbody id="task-table-body" class="text-gray-700 dark:text-gray-300">
@@ -199,6 +205,7 @@
             const showOverdueBtn = document.getElementById('show-overdue-btn');
             const showUpcomingBtn = document.getElementById('show-upcoming-btn');
             const clearFiltersBtn = document.getElementById('clear-filters-btn');
+            const showMismatchedBtn = document.getElementById('show-mismatched-btn');
 
             // SVG icons for sorting
             const sortIcons = {
@@ -209,6 +216,7 @@
 
             let allTasks = [];
             let currentSort = { column: 'DueDate', direction: 'asc' };
+            let filterMismatched = false;
 
             // --- 1. Fetch Data ---
             try {
@@ -244,7 +252,7 @@
 
                 if (tasks.length === 0) {
                     const row = document.createElement('tr');
-                    row.innerHTML = `<td colspan="5" class="text-center p-8 text-gray-500 dark:text-gray-400">No tasks match your criteria.</td>`;
+                    row.innerHTML = `<td colspan="6" class="text-center p-8 text-gray-500 dark:text-gray-400">No tasks match your criteria.</td>`;
                     tableBody.appendChild(row);
                     return;
                 }
@@ -259,8 +267,14 @@
 
                     const isOverdue = taskDueDate < today;
                     const dueDateClass = isOverdue ? 'text-red-600 font-semibold' : '';
-
                     const dueDateFormatted = taskDueDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+
+                    const originalDueDate = task.OriginalDueDate ? new Date(task.OriginalDueDate) : null;
+                    const originalDueDateFormatted = originalDueDate ? originalDueDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
+                    
+                    const datesMismatch = originalDueDate && taskDueDate.getTime() !== originalDueDate.getTime();
+                    const originalDueDateClass = datesMismatch ? 'text-yellow-500 font-semibold' : '';
+
 
                     row.innerHTML = `
                         <td class="py-4 px-5"><a href="${task.URL}" target="_blank" class="text-blue-600 hover:underline">${task.TaskID}</a></td>
@@ -268,6 +282,7 @@
                         <td class="py-4 px-5">${task.Task}</td>
                         <td class="py-4 px-5">${task.AssignedTo}</td>
                         <td class="py-4 px-5 ${dueDateClass}">${dueDateFormatted}</td>
+                        <td class="py-4 px-5 ${originalDueDateClass}">${originalDueDateFormatted}</td>
                     `;
                     tableBody.appendChild(row);
                 });
@@ -296,6 +311,11 @@
                              const dueDateFormatted = new Date(task.DueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
                              return dueDateFormatted.toLowerCase().includes(filterValue);
                         }
+                        if (key === 'OriginalDueDate') {
+                             if (!task.OriginalDueDate) return false;
+                             const originalDueDateFormatted = new Date(task.OriginalDueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                             return originalDueDateFormatted.toLowerCase().includes(filterValue);
+                        }
                         
                         return String(task[key]).toLowerCase().includes(filterValue);
                     });
@@ -304,8 +324,10 @@
                     const dateMatch = 
                         (!startDate || taskDueDate >= startDate) &&
                         (!endDate || taskDueDate <= endDate);
+                    
+                    const mismatchMatch = !filterMismatched || (task.OriginalDueDate && new Date(task.DueDate).getTime() !== new Date(task.OriginalDueDate).getTime());
 
-                    return textMatch && dateMatch;
+                    return textMatch && dateMatch && mismatchMatch;
                 });
                 renderTable(filteredTasks);
             }
@@ -335,6 +357,19 @@
                 startDateInput.value = '';
                 endDateInput.value = '';
                 columnFilters.forEach(input => input.value = '');
+                if (filterMismatched) {
+                    filterMismatched = false;
+                    showMismatchedBtn.classList.remove('ring-2', 'ring-offset-2', 'ring-yellow-400', 'dark:ring-yellow-500');
+                }
+                applyFiltersAndRender();
+            });
+
+            showMismatchedBtn.addEventListener('click', () => {
+                filterMismatched = !filterMismatched; // toggle the filter state
+                showMismatchedBtn.classList.toggle('ring-2');
+                showMismatchedBtn.classList.toggle('ring-offset-2');
+                showMismatchedBtn.classList.toggle('ring-yellow-400');
+                showMismatchedBtn.classList.toggle('dark:ring-yellow-500');
                 applyFiltersAndRender();
             });
 
@@ -346,8 +381,10 @@
                     const valB = b[column];
                     let comparison = 0;
 
-                    if (column === 'DueDate') {
-                        comparison = new Date(valA) - new Date(valB);
+                    if (column === 'DueDate' || column === 'OriginalDueDate') {
+                        const dateA = valA ? new Date(valA).getTime() : 0;
+                        const dateB = valB ? new Date(valB).getTime() : 0;
+                        comparison = dateA - dateB;
                     } else {
                         comparison = String(valA).localeCompare(String(valB));
                     }
@@ -396,7 +433,7 @@
                 }
                 
                 let csvContent = "data:text/csv;charset=utf-8,";
-                const headers = ["TaskID", "Project", "Task", "AssignedTo", "DueDate", "URL"];
+                const headers = ["TaskID", "Project", "Task", "AssignedTo", "DueDate", "OriginalDueDate", "URL"];
                 csvContent += headers.join(",") + "\r\n";
 
                 rows.forEach(row => {
@@ -407,6 +444,7 @@
                         `"${cells[2].innerText.replace(/"/g, '""')}"`, // Task
                         `"${cells[3].innerText.replace(/"/g, '""')}"`, // AssignedTo
                         `"${cells[4].innerText.replace(/"/g, '""')}"`, // DueDate
+                        `"${cells[5].innerText.replace(/"/g, '""')}"`, // OriginalDueDate
                         cells[0].querySelector('a').href // URL
                     ];
                     csvContent += rowData.join(",") + "\r\n";

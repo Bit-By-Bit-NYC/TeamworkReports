@@ -108,6 +108,7 @@ function formatTasks(tasks, projects, tasklists, users, baseUrl) {
             Task: task.name,
             AssignedTo: assigneeString,
             DueDate: task.dueDate,
+            OriginalDueDate: task.originalDueDate,
             URL: `${baseUrl}/app/tasks/${task.id}`
         };
     }).sort((a, b) => new Date(a.DueDate) - new Date(b.DueDate)); // Sort by due date
